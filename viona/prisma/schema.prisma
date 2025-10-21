@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  org_id     BigInt               @id @default(autoincrement())
+  name       String
+  created_by BigInt
+  created_at DateTime?            @default(now())
+  updated_at DateTime?            @updatedAt
+  orders     Order[]
+  creator    User                 @relation(fields: [created_by], references: [user_id])
+  invites    OrganizationInvite[]
+  members    OrganizationMember[]
+  products   Product[]
+  warehouses Warehouse[]
+}
+
+model OrganizationInvite {
+  invite_id  BigInt       @id @default(autoincrement())
+  org_id     BigInt
+  email      String
+  token      String       @unique
+  role       String
+  status     String       @default("pending")
+  created_at DateTime?    @default(now())
+  expires_at DateTime?
+  org        Organization @relation(fields: [org_id], references: [org_id])
+}
+
+model Warehouse {
+  warehouse_id  BigInt         @id @default(autoincrement())
+  name          String?
+  address       String?
+  created_at    DateTime?      @default(now())
+  updated_at    DateTime?      @updatedAt
+  org_id        BigInt?
+  productStocks ProductStock[]
+  org           Organization?  @relation(fields: [org_id], references: [org_id])
+
+  @@index([org_id])
+}
+
+model User {
+  user_id              BigInt               @id @default(autoincrement())
+  clerk_id             String               @unique
+  email                String               @unique
+  created_at           DateTime?            @default(now())
+  updated_at           DateTime?            @updatedAt
+  employees            Employee[]
+  ordersPlaced         Order[]              @relation("PlacedBy")
+  ordersUpdated        Order[]              @relation("UpdatedBy")
+  createdOrganizations Organization[]
+  organizationMembers  OrganizationMember[]
+  productsCreated      Product[]            @relation("CreatedBy")
+  productsModified     Product[]            @relation("ModifiedBy")
+}
+
+model Employee {
+  employee_id BigInt    @id @default(autoincrement())
+  name        String?
+  category    String?
+  department  String?
+  designation String?
+  hire_date   DateTime?
+  salary      Decimal?
+  permission  String?
+  created_at  DateTime? @default(now())
+  updated_at  DateTime? @updatedAt
+  user_id     BigInt
+  user        User      @relation(fields: [user_id], references: [user_id])
+}
+
+model Product {
+  product_id    BigInt         @id @default(autoincrement())
+  sku           String?
+  name          String?
+  description   String?
+  image_url     String?
+  status        String?
+  created_by    BigInt?
+  modified_by   BigInt?
+  created_at    DateTime?      @default(now())
+  updated_at    DateTime?      @updatedAt
+  org_id        BigInt
+  orderItems    OrderItem[]
+  createdBy     User?          @relation("CreatedBy", fields: [created_by], references: [user_id])
+  modifiedBy    User?          @relation("ModifiedBy", fields: [modified_by], references: [user_id])
+  org           Organization   @relation(fields: [org_id], references: [org_id])
+  productPrices ProductPrice[]
+  productStocks ProductStock[]
+
+  @@unique([org_id, sku], name: "unique_sku_per_organization")
+  @@index([org_id])
+}
+
+model ProductStock {
+  stock_id     BigInt    @id @default(autoincrement())
+  product_id   BigInt
+  warehouse_id BigInt
+  quantity     Int?
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @updatedAt
+  product      Product   @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
+  warehouse    Warehouse @relation(fields: [warehouse_id], references: [warehouse_id])
+}
+
+model ProductPrice {
+  price_id     BigInt    @id @default(autoincrement())
+  product_id   BigInt
+  actual_price Decimal?
+  retail_price Decimal?
+  market_price Decimal?
+  valid_from   DateTime?
+  valid_to     DateTime?
+  product      Product   @relation(fields: [product_id], references: [product_id], onDelete: Cascade)
+}
+
+model Order {
+  order_id         BigInt        @id @default(autoincrement())
+  placed_by        BigInt?
+  updated_by       BigInt?
+  order_date       DateTime?
+  status           String?
+  total_amount     Decimal?
+  created_at       DateTime?     @default(now())
+  updated_at       DateTime?     @updatedAt
+  org_id           BigInt?
+  customer_name    String?
+  customer_email   String?
+  customer_phone   String?
+  shipping_street  String?
+  shipping_city    String?
+  shipping_state   String?
+  shipping_zip     String?
+  shipping_country String?
+  notes            String?
+  shipping_method  String?
+  payment_method   String?
+  org              Organization? @relation(fields: [org_id], references: [org_id])
+  placedBy         User?         @relation("PlacedBy", fields: [placed_by], references: [user_id])
+  updatedBy        User?         @relation("UpdatedBy", fields: [updated_by], references: [user_id])
+  orderItems       OrderItem[]
+
+  @@index([org_id])
+}
+
+model OrderItem {
+  order_item_id  BigInt   @id @default(autoincrement())
+  order_id       BigInt
+  product_id     BigInt
+  quantity       Int?
+  price_at_order Decimal?
+  order          Order    @relation(fields: [order_id], references: [order_id], onDelete: Cascade)
+  product        Product  @relation(fields: [product_id], references: [product_id])
+}
+
+model OrganizationMember {
+  id         BigInt       @id @default(autoincrement())
+  org_id     BigInt
+  user_id    BigInt
+  role       String
+  created_at DateTime?    @default(now())
+  updated_at DateTime?    @updatedAt
+  org        Organization @relation(fields: [org_id], references: [org_id])
+  user       User         @relation(fields: [user_id], references: [user_id])
+
+  @@unique([org_id, user_id])
+  @@index([org_id])
+  @@index([user_id])
+}
